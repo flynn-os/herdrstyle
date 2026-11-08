@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="zh-CN" data-ui-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Herdrstyle — Visual Theme &amp; Appearance Studio for Herdr</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="studio-shell">
+      <!-- Top Studio Toolbar -->
+      <header class="studio-toolbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">H</div>
+          <div class="brand-copy">
+            <p class="eyebrow">HERDR VISUAL STUDIO</p>
+            <h1>Herdrstyle</h1>
+          </div>
+        </div>
+
+        <nav class="studio-nav-pills" aria-label="Studio Sections">
+          <button class="nav-item is-active" type="button" data-panel="themes">
+            <span class="nav-icon">◐</span>
+            <span data-i18n="nav.themes">主题与预览</span>
+          </button>
+          <button class="nav-item" type="button" data-panel="look">
+            <span class="nav-icon">🎨</span>
+            <span data-i18n="nav.look">外观与布局微调</span>
+          </button>
+          <button class="nav-item" type="button" data-panel="common">
+            <span class="nav-icon">⌘</span>
+            <span data-i18n="nav.common">字体与常用设置</span>
+          </button>
+          <button class="nav-item" type="button" data-panel="history">
+            <span class="nav-icon">🕒</span>
+            <span><span data-i18n="nav.history">配置历史</span> <span id="nav-history-badge">(0)</span></span>
+          </button>
+          <button class="nav-item" type="button" data-panel="raw">
+            <span class="nav-icon">&lt;/&gt;</span>
+            <span data-i18n="nav.raw">原始配置</span>
+          </button>
+        </nav>
+
+        <div class="topbar-actions">
+          <div class="mini-segmented" id="ui-lang-switcher" title="切换语言 / Switch Language">
+            <button type="button" data-lang="zh" class="is-active">中文</button>
+            <button type="button" data-lang="en">EN</button>
+          </div>
+          <div class="mini-segmented" id="ui-theme-switcher" title="切换工作台明暗外观">
+            <button type="button" data-ui-mode="dark" class="is-active" data-i18n="top.darkUi">深色台</button>
+            <button type="button" data-ui-mode="light" data-i18n="top.lightUi">浅色台</button>
+          </div>
+          <button class="shutdown-button" id="shutdown-btn" type="button" title="停止本地 Herdrstyle 服务">
+            <span>⏻</span>
+            <span data-i18n="top.exit">退出</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Global Status Strip -->
+      <div class="studio-status-strip">
+        <div class="status-strip-group">
+          <span class="status-dot" id="herdr-status-dot"></span>
+          <span id="herdr-status-text">正在连接 Herdr App…</span>
+        </div>
+        <div class="status-strip-divider"></div>
+        <div class="status-strip-group">
+          <span data-i18n="status.layout">当前布局:</span>
+          <span class="code-badge" id="status-layout-name">mine</span>
+        </div>
+        <div class="status-strip-divider"></div>
+        <div class="status-strip-group">
+          <span data-i18n="status.theme">当前主题:</span>
+          <span class="code-badge" id="status-theme-name">catppuccin-mocha</span>
+        </div>
+        <div class="status-strip-divider"></div>
+        <div class="status-strip-group">
+          <span data-i18n="status.home">配置目录:</span>
+          <span class="code-badge" id="status-app-home">~/.config/herdr-app</span>
+        </div>
+        <div class="status-strip-divider"></div>
+        <div class="status-strip-group" id="status-counts">
+          <span id="status-theme-count">— 套主题</span> ·
+          <span id="status-font-count">— 款字体</span>
+        </div>
+      </div>
+
+      <!-- ==================================================================
+           Panel 1: Themes & Live Stage
+           ================================================================== -->
+      <section class="panel is-active" data-panel-content="themes">
+        <div class="studio-split-layout">
+          <!-- Left: 800+ Theme Gallery -->
+          <div class="studio-gallery-column">
+            <div class="gallery-section-header">
+              <p class="eyebrow">PRESET &amp; COMMUNITY GALLERY // 全景主题库</p>
+              <h3 data-i18n="gallery.heading">Herdr 全景主题画廊</h3>
+              <p data-i18n="gallery.desc">汇聚 Herdr 官方内置预设、社区人气 Top 经典以及本机 800+ 套 Ghostty 主题。点击任意卡片即可自动生成 Herdr 主题并秒级热重载至桌面端。</p>
+            </div>
+
+            <div class="gallery-toolbar">
+              <label class="search-box">
+                <span>⌕</span>
+                <input id="theme-search" type="search" placeholder="搜索主题，如 Catppuccin, TokyoNight, Rose Pine, Gruvbox…" autocomplete="off">
+              </label>
+              <div class="filter-pills" id="theme-filter">
+                <button class="is-active" type="button" data-filter="featured" data-i18n="filter.featured">★ 精选经典</button>
+                <button type="button" data-filter="all" data-i18n="filter.all">全部 (800+)</button>
+                <button type="button" data-filter="dark" data-i18n="filter.dark">🌙 深色</button>
+                <button type="button" data-filter="light" data-i18n="filter.light">☀️ 浅色</button>
+                <button type="button" data-filter="installed" data-i18n="filter.installed">已安装</button>
+              </div>
+              <span class="gallery-result" id="gallery-result"></span>
+            </div>
+
+            <div class="theme-gallery" id="theme-gallery"></div>
+          </div>
+
+          <!-- Right: Sticky Studio Stage -->
+          <div class="studio-stage-column">
+            <div class="studio-stage-sticky-card">
+              <div class="stage-header-bar">
+                <div class="stage-title-group">
+                  <span class="eyebrow">LIVE STAGE</span>
+                  <h4 id="stage-theme-title">Catppuccin Mocha</h4>
+                </div>
+                <div class="mini-segmented" id="stage-view-mode">
+                  <button type="button" data-stage-view="mockup" class="is-active" data-i18n="stage.mockup">🖥 仿真交互预览</button>
+                  <button type="button" data-stage-view="shot" data-i18n="stage.shot">📸 真实窗口抓拍</button>
+                </div>
+              </div>
+
+              <!-- Simulated Herdr Window Preview -->
+              <div id="stage-mockup-wrap">
+                <div class="herdr-live-mockup" id="herdr-mockup">
+                  <div class="hm-sidebar" id="hm-sidebar">
+                    <div class="hm-brand">
+                      <div class="hm-traffic"><i></i><i></i><i></i></div>
+                      <span>Herdr</span>
+                    </div>
+                    <div class="hm-section-label">Spaces</div>
+                    <div class="hm-item" id="hm-space-1">
+                      <div class="hm-item-left">
+                        <span class="hm-tile" id="hm-tile-1">H</span>
+                        <span>herdr-core</span>
+                      </div>
+                      <span class="hm-dot" id="hm-dot-work"></span>
+                    </div>
+                    <div class="hm-item is-selected" id="hm-space-2">
+                      <div class="hm-item-left">
+                        <span class="hm-tile" id="hm-tile-2">W</span>
+                        <span>web-studio</span>
+                      </div>
+                      <span class="hm-dot" id="hm-dot-done"></span>
+                    </div>
+                    <div class="hm-section-label">Agents</div>
+                    <div class="hm-item" id="hm-agent-1">
+                      <div class="hm-item-left">
+                        <span>✦ claude</span>
+                      </div>
+                      <span style="font-size:10px;opacity:0.7">working</span>
+                    </div>
+                    <div class="hm-item" id="hm-agent-2">
+                      <div class="hm-item-left">
+                        <span>◈ opencode</span>
+                      </div>
+                      <span style="font-size:10px;opacity:0.7">ready</span>
+                    </div>
+                    <div class="hm-footer">⚙ Settings · + Add machine</div>
+                  </div>
+
+                  <div class="hm-work">
+                    <div class="hm-tabs" id="hm-tabs">
+                      <div class="hm-tab" id="hm-tab-active">
+                        <span>◈ opencode</span>
+                        <span style="opacity:0.6">×</span>
+                      </div>
+                      <div class="hm-tab" id="hm-tab-inactive">
+                        <span>✦ claude</span>
+                      </div>
+                      <span style="opacity:0.5;padding-left:4px">+</span>
+                    </div>
+
+                    <div class="hm-canvas" id="hm-canvas">
+                      <!-- Focused Pane -->
+                      <div class="hm-pane" id="hm-pane-focused">
+                        <div class="hm-pane-header" id="hm-pane-header-1">
+                          <span id="hm-pane-title-1">◈ opencode  ~/workspace/herdr</span>
+                          <span id="hm-pane-badge-1">FOCUSED</span>
+                        </div>
+                        <div class="hm-pane-body" id="hm-pane-body-1">
+                          <p><span id="hm-c-prompt">➜</span> <span id="hm-c-path">~/workspace/herdr</span> <span id="hm-c-branch">git:(main)</span></p>
+                          <p><span id="hm-c-cmd">herdr-app</span> <span id="hm-c-arg">do app.theme</span></p>
+                          <p><span id="hm-c-ok">✓ Theme synced in 18ms</span></p>
+                          <p><span id="hm-c-kw">export</span> <span id="hm-c-fn"> theme</span> = <span id="hm-c-str">"catppuccin-mocha"</span></p>
+                          <p><span id="hm-c-comment"># CJK 2:1 &amp; Ligatures preview !== =&gt;</span></p>
+                          <p><span>➜ </span><span id="hm-cursor">█</span></p>
+                        </div>
+                      </div>
+
+                      <!-- Unfocused Split Pane -->
+                      <div class="hm-pane" id="hm-pane-unfocused">
+                        <div class="hm-pane-header" id="hm-pane-header-2">
+                          <span>✦ claude  ~/projects/api</span>
+                          <span style="opacity:0.55">split</span>
+                        </div>
+                        <div class="hm-pane-body" id="hm-pane-body-2">
+                          <p><span id="hm-c2-title">● Agent working…</span></p>
+                          <p><span id="hm-c2-dim">Reading ~/.config/herdr-app/</span></p>
+                          <p><span id="hm-c2-add">+ layouts/mine.json</span></p>
+                          <p><span id="hm-c2-warn">! minimum_contrast: active</span></p>
+                          <p><span id="hm-c2-err">- 0 errors reported</span></p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="hm-ansi-strip" id="hm-ansi-strip" title="16 ANSI Terminal Palette"></div>
+                    <div class="hm-statusbar" id="hm-statusbar">
+                      <span>This computer • 4 agents</span>
+                      <span id="hm-status-meta">Zoom 120% • Radius 10px</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Real Herdr GPU Screenshot -->
+              <div id="stage-shot-wrap" class="is-hidden">
+                <div class="real-shot-container">
+                  <img id="real-shot-img" alt="Herdr App Live Window Screenshot">
+                </div>
+              </div>
+
+              <!-- Stage Control Dock -->
+              <div class="stage-control-dock">
+                <div class="dock-row">
+                  <span style="font-size:12.5px;font-weight:600;color:var(--text-dim)" data-i18n="stage.appearance">外观明暗模式 (Appearance)</span>
+                  <div class="mini-segmented" id="appearance-mode-group">
+                    <button type="button" data-appearance="dark" data-i18n="stage.apDark">🌙 深色 (Dark)</button>
+                    <button type="button" data-appearance="light" data-i18n="stage.apLight">☀️ 浅色 (Light)</button>
+                    <button type="button" data-appearance="system" data-i18n="stage.apSystem">🖥 跟随系统</button>
+                  </div>
+                </div>
+
+                <div class="dock-slot-grid">
+                  <div class="slot-box">
+                    <label>
+                      <span data-i18n="stage.darkSlot">🌙 深色槽位 (Dark Theme)</span>
+                      <span style="color:var(--accent)">Dark</span>
+                    </label>
+                    <select id="dark-theme-select"></select>
+                  </div>
+                  <div class="slot-box">
+                    <label>
+                      <span data-i18n="stage.lightSlot">☀️ 浅色槽位 (Light Theme)</span>
+                      <span style="color:var(--warning)">Light</span>
+                    </label>
+                    <select id="light-theme-select"></select>
+                  </div>
+                </div>
+
+                <div class="quick-sliders-grid">
+                  <div class="mini-slider-box">
+                    <div class="mini-slider-header">
+                      <span data-i18n="stage.zoom">🔍 全局缩放 (Zoom)</span>
+                      <strong id="stage-zoom-val">120%</strong>
+                    </div>
+                    <input type="range" id="stage-zoom-slider" min="0.8" max="2.0" step="0.05" value="1.2">
+                  </div>
+                  <div class="mini-slider-box">
+                    <div class="mini-slider-header">
+                      <span data-i18n="stage.radius">▢ 卡片圆角 (Radius)</span>
+                      <strong id="stage-radius-val">10px</strong>
+                    </div>
+                    <input type="range" id="stage-radius-slider" min="0" max="22" step="1" value="10">
+                  </div>
+                  <div class="mini-slider-box">
+                    <div class="mini-slider-header">
+                      <span data-i18n="stage.gap">⇔ 窗格间距 (Gap)</span>
+                      <strong id="stage-gap-val">8px</strong>
+                    </div>
+                    <input type="range" id="stage-gap-slider" min="0" max="20" step="1" value="8">
+                  </div>
+                  <div class="mini-slider-box">
+                    <div class="mini-slider-header">
+                      <span data-i18n="stage.opacity">◐ 终端不透明度</span>
+                      <strong id="stage-opacity-val">100%</strong>
+                    </div>
+                    <input type="range" id="stage-opacity-slider" min="0.25" max="1" step="0.05" value="1">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Sticky Action Bar -->
+              <footer class="actionbar">
+                <div class="action-status">
+                  <label class="live-sync-label" title="开启后，任何点击和滑块调节都会立即实时应用到正在运行的 Herdr App">
+                    <input type="checkbox" id="live-sync-checkbox" checked>
+                    <span data-i18n="action.liveSync">⚡️ 真实 Herdr 实时联动</span>
+                  </label>
+                  <button class="secondary-button" type="button" id="revert-baseline-btn" data-i18n="action.revert">↩ 还原初始</button>
+                </div>
+                <div class="action-buttons">
+                  <button class="secondary-button" type="button" id="refresh-shot-btn" data-i18n="action.shot">📸 抓拍窗口</button>
+                  <button class="primary-button" type="button" id="save-snapshot-btn" data-i18n="action.save">💾 保存快照并应用</button>
+                </div>
+              </footer>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================================
+           Panel 2: Look & Layout Studio
+           ================================================================== -->
+      <section class="panel" data-panel-content="look">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">HERDR EXCLUSIVE // 深度视觉定制</p>
+            <h2 data-i18n="look.heading">外观色板与布局卡片微调</h2>
+            <p data-i18n="look.desc">精细定制 Herdr 的侧边栏、底层画布、强调色、分屏卡片圆角/间距/顶栏与极光渐变背景，修改实时在 Herdr 窗口生效。</p>
+          </div>
+          <div class="action-buttons">
+            <button class="secondary-button" type="button" id="reset-colors-btn" data-i18n="look.resetColors">🧹 清除自定义色彩覆盖</button>
+            <button class="primary-button" type="button" id="save-look-btn" data-i18n="look.save">💾 保存当前外观快照</button>
+          </div>
+        </div>
+
+        <div class="settings-grid">
+          <article class="settings-card" style="grid-column: 1 / -1;">
+            <div class="settings-card-heading">
+              <div>
+                <h3>🎨 Herdr 界面语义色板微调 (Semantic UI Colors)</h3>
+                <p>在当前主题基础上单独微调任意 UI 区域颜色（写入 <code>settings.json -&gt; colors</code>）。点击「清除自定义色彩覆盖」可随时还原为主题原生派生色。</p>
+              </div>
+            </div>
+            <div class="color-tokens-grid" id="color-tokens-grid"></div>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-heading">
+              <div>
+                <h3>▢ 分屏卡片与边框 (Pane Frames)</h3>
+                <p>控制终端窗格的卡片圆角、间距、单窗格边框与键盘焦点高亮效果。</p>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">卡片圆角 (Pane Radius)</div>
+                <p class="settings-row-desc">每个终端卡片的圆角弧度 (0px 直角 ~ 22px 圆润)</p>
+              </div>
+              <div class="settings-row-control">
+                <div class="pill-group" id="radius-pills">
+                  <button type="button" class="pill-btn" data-radius="0">0 直角</button>
+                  <button type="button" class="pill-btn" data-radius="6">6 微圆</button>
+                  <button type="button" class="pill-btn" data-radius="10">10 默认</button>
+                  <button type="button" class="pill-btn" data-radius="14">14 圆润</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">分屏窗格间距 (Pane Gap)</div>
+                <p class="settings-row-desc">相邻分屏终端之间的留白距离</p>
+              </div>
+              <div class="settings-row-control">
+                <div class="pill-group" id="gap-pills">
+                  <button type="button" class="pill-btn" data-gap="0">0 无缝</button>
+                  <button type="button" class="pill-btn" data-gap="4">4 紧凑</button>
+                  <button type="button" class="pill-btn" data-gap="8">8 默认</button>
+                  <button type="button" class="pill-btn" data-gap="14">14 宽松</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">工作区外边距 (Work Body Padding)</div>
+                <p class="settings-row-desc">终端区域与窗口四周边缘的呼吸留白</p>
+              </div>
+              <div class="settings-row-control">
+                <input type="range" id="look-work-padding" class="range-slider" min="0" max="24" step="2" style="width:120px">
+                <span class="code-badge" id="look-work-padding-val">8px</span>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">焦点窗格边框颜色 (Focus Border)</div>
+                <p class="settings-row-desc">当前激活终端窗格的边框颜色策略</p>
+              </div>
+              <div class="settings-row-control">
+                <select id="look-focus-color" class="modern-select" style="width:190px">
+                  <option value="accent">强调色高亮 (accent 推荐)</option>
+                  <option value="border">低调同色边框 (border)</option>
+                  <option value="foreground">前景亮色 (foreground)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">焦点边框粗细 (Focus Width)</div>
+                <p class="settings-row-desc">激活窗格边框线宽 (px)</p>
+              </div>
+              <div class="settings-row-control">
+                <div class="pill-group" id="focus-width-pills">
+                  <button type="button" class="pill-btn" data-fwidth="1">1px 精致</button>
+                  <button type="button" class="pill-btn" data-fwidth="2">2px 醒目</button>
+                  <button type="button" class="pill-btn" data-fwidth="3">3px 强焦点</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">单窗格也显示卡片框架 (Lone Frame)</div>
+                <p class="settings-row-desc">未分屏时是否依然保留卡片圆角、边框与顶栏</p>
+              </div>
+              <div class="settings-row-control">
+                <input type="checkbox" id="look-pane-lone" checked>
+              </div>
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-heading">
+              <div>
+                <h3>◫ 顶栏、侧边栏与画布材质</h3>
+                <p>定制窗格顶栏显示模式、侧边栏宽度以及终端内边距与极光渐变画布。</p>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">窗格顶栏显示模式 (Pane Header)</div>
+                <p class="settings-row-desc">常驻显示、仅鼠标悬停时浮现，或完全隐藏窗格顶栏</p>
+              </div>
+              <div class="settings-row-control">
+                <select id="look-header-mode" class="modern-select" style="width:190px">
+                  <option value="always">常驻显示 (Always)</option>
+                  <option value="hover">悬停浮现 (Hover)</option>
+                  <option value="none">完全隐藏 (Hidden)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">窗格顶栏位置与高度</div>
+                <p class="settings-row-desc">顶栏位于终端上方或下方，以及高度像素</p>
+              </div>
+              <div class="settings-row-control">
+                <select id="look-header-pos" class="modern-select" style="width:96px">
+                  <option value="top">顶部</option>
+                  <option value="bottom">底部</option>
+                </select>
+                <input type="number" id="look-header-height" class="modern-input" min="22" max="44" step="1" style="width:74px" value="30">
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">左侧边栏宽度 (Sidebar Width)</div>
+                <p class="settings-row-desc">Spaces 与 Agents 侧边栏宽度，以及是否允许鼠标拖拽</p>
+              </div>
+              <div class="settings-row-control">
+                <input type="range" id="look-sidebar-width" class="range-slider" min="180" max="420" step="4" style="width:110px">
+                <span class="code-badge" id="look-sidebar-width-val">268px</span>
+                <label style="font-size:12px;display:inline-flex;align-items:center;gap:4px" title="允许鼠标拖拽侧边栏边缘调宽">
+                  <input type="checkbox" id="look-sidebar-resizable"> 可拖拽
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">终端内边距 (Terminal Padding)</div>
+                <p class="settings-row-desc">终端文字距离卡片四边的上下 / 左右内边距 (px)</p>
+              </div>
+              <div class="settings-row-control">
+                <span style="font-size:12px;color:var(--muted)">上下</span>
+                <input type="number" id="look-pad-v" class="modern-input" min="0" max="40" style="width:64px" value="14">
+                <span style="font-size:12px;color:var(--muted)">左右</span>
+                <input type="number" id="look-pad-h" class="modern-input" min="0" max="40" style="width:64px" value="12">
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">底层画布背景材质 (Root Canvas)</div>
+                <p class="settings-row-desc">调低终端不透明度 (如 85%) 时，底层极光渐变会透过终端显现</p>
+              </div>
+              <div class="settings-row-control">
+                <select id="look-canvas-preset" class="modern-select" style="width:220px"></select>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ==================================================================
+           Panel 3: Fonts, Zoom & Essentials
+           ================================================================== -->
+      <section class="panel" data-panel-content="common">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">TYPOGRAPHY &amp; ESSENTIALS // 字体与可读性</p>
+            <h2 data-i18n="common.heading">字体、全局缩放与跨端联动</h2>
+            <p data-i18n="common.desc">配置 Herdr 的终端等宽字体、界面 UI 字体、字号、全局缩放倍率与最低对比度保护。</p>
+          </div>
+          <div class="action-buttons">
+            <button class="secondary-button" type="button" id="sync-ghostty-btn" data-i18n="common.syncGhostty">🔗 同步当前主题与字体至 Ghostty</button>
+          </div>
+        </div>
+
+        <div class="settings-grid">
+          <article class="settings-card">
+            <div class="settings-card-heading">
+              <div>
+                <h3>🔤 终端与界面字体 (Fonts)</h3>
+                <p>分别指定终端内代码等宽字体与 Herdr 侧边栏/标签栏 UI 字体。</p>
+              </div>
+            </div>
+
+            <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+              <div class="settings-row-info">
+                <div class="settings-row-title">终端主字体 (Terminal Font)</div>
+                <p class="settings-row-desc">推荐使用 Maple Mono NF CN（自带中文 2:1 对齐与 Nerd 图标）或 JetBrains Mono</p>
+              </div>
+              <select id="common-font-select" class="modern-select"></select>
+              <div class="pill-group" id="quick-font-pills">
+                <button type="button" class="pill-btn" data-font="Maple Mono NF CN">Maple Mono NF CN</button>
+                <button type="button" class="pill-btn" data-font="JetBrains Mono">JetBrains Mono</button>
+                <button type="button" class="pill-btn" data-font="Geist Mono">Geist Mono</button>
+                <button type="button" class="pill-btn" data-font="FiraCode Nerd Font Mono">FiraCode Nerd</button>
+                <button type="button" class="pill-btn" data-font="Sarasa Term SC">更纱黑体</button>
+              </div>
+            </div>
+
+            <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+              <div class="settings-row-info">
+                <div class="settings-row-title">界面 UI 字体 (Interface Font)</div>
+                <p class="settings-row-desc">侧边栏、标签页、状态栏与弹窗的显示字体</p>
+              </div>
+              <select id="common-ui-font-select" class="modern-select"></select>
+              <div class="pill-group" id="quick-ui-font-pills">
+                <button type="button" class="pill-btn" data-uifont="Maple Mono NF CN">Maple Mono NF CN</button>
+                <button type="button" class="pill-btn" data-uifont="Geist">Geist (Default)</button>
+                <button type="button" class="pill-btn" data-uifont="JetBrains Mono">JetBrains Mono</button>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">终端基准字号 (Font Size)</div>
+                <p class="settings-row-desc">Zoom 为 100% 时的基准字号 (实际显示字号 = 基准字号 × Zoom)</p>
+              </div>
+              <div class="settings-row-control">
+                <div class="pill-group" id="fontsize-pills">
+                  <button type="button" class="pill-btn" data-fsize="12">12</button>
+                  <button type="button" class="pill-btn" data-fsize="13">13</button>
+                  <button type="button" class="pill-btn" data-fsize="14">14</button>
+                  <button type="button" class="pill-btn" data-fsize="15">15</button>
+                  <button type="button" class="pill-btn" data-fsize="16">16</button>
+                </div>
+                <input type="number" id="common-font-size" class="modern-input" min="8" max="32" step="0.5" style="width:70px" value="14">
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">编程连字 (Font Ligatures)</div>
+                <p class="settings-row-desc">启用 !==、=&gt;、-&gt; 等符号连字特性（光标所在处会自动拆开保持清晰）</p>
+              </div>
+              <div class="settings-row-control">
+                <input type="checkbox" id="common-ligatures">
+              </div>
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <div class="settings-card-heading">
+              <div>
+                <h3>🔍 缩放、对比度与终端体验</h3>
+                <p>调整全局 DPI 缩放、暗淡文本对比度提亮阈值与键盘交互细节。</p>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">全局缩放比例 (Global Zoom)</div>
+                <p class="settings-row-desc">等比缩放整个 Herdr 窗口的所有终端文字、侧边栏与图标</p>
+              </div>
+              <div class="settings-row-control">
+                <div class="pill-group" id="zoom-pills">
+                  <button type="button" class="pill-btn" data-zoom="1">100%</button>
+                  <button type="button" class="pill-btn" data-zoom="1.1">110%</button>
+                  <button type="button" class="pill-btn" data-zoom="1.2">120%</button>
+                  <button type="button" class="pill-btn" data-zoom="1.3">130%</button>
+                  <button type="button" class="pill-btn" data-zoom="1.5">150%</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">最低对比度保护 (Minimum Contrast)</div>
+                <p class="settings-row-desc">自动提亮低于该对比度阈值的暗淡注释文字 (1.0 为关闭，推荐 1.6 ~ 3.0)</p>
+              </div>
+              <div class="settings-row-control">
+                <div class="pill-group" id="contrast-pills">
+                  <button type="button" class="pill-btn" data-contrast="1">1.0 原色</button>
+                  <button type="button" class="pill-btn" data-contrast="1.6">1.6 柔和提亮</button>
+                  <button type="button" class="pill-btn" data-contrast="3">3.0 清晰</button>
+                  <button type="button" class="pill-btn" data-contrast="4.5">4.5 强对比</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">macOS Option 键行为 (Option as Alt)</div>
+                <p class="settings-row-desc">控制 Option 键用于终端 Alt 快捷键还是输入特殊字符</p>
+              </div>
+              <div class="settings-row-control">
+                <select id="common-option-alt" class="modern-select" style="width:185px">
+                  <option value="auto">自动 (US 键盘作为 Alt)</option>
+                  <option value="on">始终作为 Alt</option>
+                  <option value="off">输入特殊字符</option>
+                  <option value="left">仅左 Option 为 Alt</option>
+                  <option value="right">仅右 Option 为 Alt</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">显示终端滚动条 (Pane Scrollbars)</div>
+                <p class="settings-row-desc">当终端存在历史滚动缓冲区时在右侧边缘显示细滚动条</p>
+              </div>
+              <div class="settings-row-control">
+                <input type="checkbox" id="common-scrollbars" checked>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <div class="settings-row-title">Agent 状态提示音 (Alert Sounds)</div>
+                <p class="settings-row-desc">当后台 Agent 完成任务或需要人工确认时播放提示音</p>
+              </div>
+              <div class="settings-row-control">
+                <input type="checkbox" id="common-sounds" checked>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ==================================================================
+           Panel 4: Config History & Snapshots
+           ================================================================== -->
+      <section class="panel" data-panel-content="history">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">TIME MACHINE // 历史快照回滚</p>
+            <h2 data-i18n="history.heading">配置历史与一键恢复</h2>
+            <p data-i18n="history.desc">完整记录你的主题、色板覆盖、字体与布局参数快照，随时一键无损回滚。</p>
+          </div>
+          <div class="action-buttons">
+            <button class="primary-button" type="button" id="create-snapshot-now-btn" data-i18n="history.create">+ 新建当前状态快照</button>
+          </div>
+        </div>
+
+        <div class="history-layout">
+          <div class="settings-card">
+            <div class="settings-card-heading">
+              <h3>Snapshots</h3>
+            </div>
+            <div class="history-list" id="history-list"></div>
+          </div>
+
+          <div class="settings-card" id="history-detail-card">
+            <div class="settings-card-heading">
+              <div>
+                <h3 id="history-detail-title">选择一个快照查看详情</h3>
+                <p id="history-detail-meta">—</p>
+              </div>
+              <div class="action-buttons">
+                <button class="secondary-button" type="button" id="history-rename-btn" data-i18n="history.rename">✏️ 重命名备注</button>
+                <button class="secondary-button" type="button" id="history-delete-btn" style="color:var(--danger)" data-i18n="history.delete">🗑 删除</button>
+                <button class="primary-button" type="button" id="history-restore-btn" data-i18n="history.restore">⏪ 恢复此快照</button>
+              </div>
+            </div>
+            <div id="history-visual-summary" class="pill-group"></div>
+            <pre id="history-json-preview" class="raw-editor-textarea" style="min-height:380px;margin:0;overflow:auto;"></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================================
+           Panel 5: Raw JSON Config Editor
+           ================================================================== -->
+      <section class="panel" data-panel-content="raw">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">RAW JSON WORKBENCH // 底层文件直编</p>
+            <h2 data-i18n="raw.heading">原始配置文件编辑器</h2>
+            <p data-i18n="raw.desc">直接查看或编辑 Herdr 的底层 JSON 文件，保存前自动进行 JSON 语法校验并实时热重载。</p>
+          </div>
+          <div class="action-buttons">
+            <div class="mini-segmented" id="raw-target-tabs">
+              <button type="button" data-raw-target="settings" class="is-active">settings.json</button>
+              <button type="button" data-raw-target="layout">layout.json</button>
+              <button type="button" data-raw-target="theme">theme.json</button>
+            </div>
+            <button class="secondary-button" type="button" id="raw-format-btn" data-i18n="raw.format">格式化 JSON</button>
+            <button class="primary-button" type="button" id="raw-save-btn" data-i18n="raw.save">💾 校验并保存应用</button>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-card-heading">
+            <div>
+              <h3 id="raw-file-path">~/.config/herdr-app/settings.json</h3>
+              <p>Changes are validated as JSON and applied immediately to the running Herdr App.</p>
+            </div>
+          </div>
+          <textarea id="raw-textarea" class="raw-editor-textarea" spellcheck="false"></textarea>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

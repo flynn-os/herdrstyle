@@ -1,0 +1,38 @@
+{
+  "name": "herdrstyle",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A bilingual, zero-dependency visual theme & appearance studio for Herdr App.",
+  "license": "MIT",
+  "bin": {
+    "herdrstyle": "./bin/herdrstyle.mjs",
+    "hstyle": "./bin/herdrstyle.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flynn-os/herdrstyle.git"
+  },
+  "homepage": "https://github.com/flynn-os/herdrstyle#readme",
+  "bugs": {
+    "url": "https://github.com/flynn-os/herdrstyle/issues"
+  },
+  "keywords": [
+    "herdr",
+    "herdr-app",
+    "ghostty",
+    "terminal",
+    "themes",
+    "configuration",
+    "studio",
+    "macos"
+  ],
+  "scripts": {
+    "start": "node bin/herdrstyle.mjs --open",
+    "start:no-open": "node bin/herdrstyle.mjs",
+    "test": "node --test",
+    "check": "node --check server.mjs && node --check bin/herdrstyle.mjs && node --check src/server.mjs && node --check src/herdr-bridge.mjs && node --check src/themes-catalog.mjs && node --check src/history-store.mjs && node --check public/app.js && node --check public/i18n.js && node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
