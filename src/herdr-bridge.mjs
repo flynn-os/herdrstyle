@@ -552,13 +552,72 @@ export function applyLayoutPatchToTree(layoutTree, patch = {}) {
   return tree;
 }
 
-export async function readHerdrState(appHome, herdrBin, themes) {
+export async function detectSystemAppearance(overrideSystemAppearance = null) {
+  if (overrideSystemAppearance === "light" || overrideSystemAppearance === "dark") {
+    return overrideSystemAppearance;
+  }
+  if (platform() === "darwin") {
+    const res = await runCmd("/usr/bin/defaults", ["read", "-g", "AppleInterfaceStyle"], {
+      timeout: 1500,
+    });
+    return res.ok && /dark/i.test(res.stdout) ? "dark" : "light";
+  }
+  return "dark";
+}
+
+export function resolveThemePair(layoutState, layoutTree, settingsJson, findTheme) {
+  const extractSpec = (spec) => {
+    if (!spec) return { light: null, dark: null };
+    if (typeof spec === "object") {
+      return {
+        light: typeof spec.light === "string" && spec.light.trim() ? spec.light.trim() : null,
+        dark: typeof spec.dark === "string" && spec.dark.trim() ? spec.dark.trim() : null,
+      };
+    }
+    if (typeof spec === "string" && spec.trim()) {
+      const name = spec.trim();
+      const entry = findTheme?.(name);
+      if (entry?.mode === "light") return { light: name, dark: null };
+      return { light: null, dark: name };
+    }
+    return { light: null, dark: null };
+  };
+
+  const fromState = extractSpec(layoutState?.theme);
+  const fromLayout = extractSpec(layoutTree?.theme);
+  const fromSettings = extractSpec(settingsJson?.theme);
+
+  return {
+    darkHerdrName: fromState.dark || fromLayout.dark || fromSettings.dark || "graphite",
+    lightHerdrName: fromState.light || fromLayout.light || fromSettings.light || "paper",
+  };
+}
+
+export async function applyHerdrThemeCommand(herdrBin, appHome, herdrName, freshlyCreated = false) {
+  if (!herdrBin || !herdrName) return { ok: false, stdout: "", stderr: "Missing binary or theme", code: 127 };
+  let res = await runCmd(herdrBin, ["do", "app.theme", "--name", herdrName], {
+    env: { HERDR_APP_HOME: appHome },
+  });
+  if (!res.ok && freshlyCreated) {
+    for (const delayMs of [50, 120, 250]) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      res = await runCmd(herdrBin, ["do", "app.theme", "--name", herdrName], {
+        env: { HERDR_APP_HOME: appHome },
+      });
+      if (res.ok) break;
+    }
+  }
+  return res;
+}
+
+export async function readHerdrState(appHome, herdrBin, themes, options = {}) {
   const settingsPath = path.join(appHome, "settings.json");
   const sharedPath = path.join(appHome, "shared.json");
-  const [settingsJson, sharedJson, statusRes] = await Promise.all([
+  const [settingsJson, sharedJson, statusRes, systemAppearance] = await Promise.all([
     readJsonSafe(settingsPath, {}),
     readJsonSafe(sharedPath, {}),
     runCmd(herdrBin, ["status"], { env: { HERDR_APP_HOME: appHome } }),
+    detectSystemAppearance(options.systemAppearance),
   ]);
 
   let liveStatus = null;
@@ -581,20 +640,8 @@ export async function readHerdrState(appHome, herdrBin, themes) {
     readJsonSafe(layoutStatePath, {}),
   ]);
 
-  const darkThemeName =
-    layoutState?.theme?.dark ||
-    (typeof settingsJson.theme === "object" ? settingsJson.theme?.dark : settingsJson.theme) ||
-    "catppuccin-mocha";
-  const lightThemeName =
-    layoutState?.theme?.light ||
-    (typeof settingsJson.theme === "object" ? settingsJson.theme?.light : null) ||
-    "paper";
-
-  const appearance = settingsJson.appearance || "system";
-  const effectiveMode = appearance === "light" ? "light" : "dark";
-  const activeThemeHerdrName = effectiveMode === "light" ? lightThemeName : darkThemeName;
-
-  const findThemeEntry = (name) => {
+  const lookupTheme = (name) => {
+    if (!name) return null;
     const slug = slugifyThemeName(name);
     return (
       themes.find(
@@ -602,9 +649,23 @@ export async function readHerdrState(appHome, herdrBin, themes) {
           t.herdrName === name ||
           t.id === slug ||
           t.name.toLowerCase() === String(name).toLowerCase(),
-      ) || themes[0]
+      ) || null
     );
   };
+
+  const { darkHerdrName: darkThemeName, lightHerdrName: lightThemeName } = resolveThemePair(
+    layoutState,
+    layoutTree,
+    settingsJson,
+    lookupTheme,
+  );
+
+  const appearance = settingsJson.appearance || "system";
+  const effectiveMode =
+    appearance === "light" ? "light" : appearance === "dark" ? "dark" : systemAppearance;
+  const activeThemeHerdrName = effectiveMode === "light" ? lightThemeName : darkThemeName;
+
+  const findThemeEntry = (name) => lookupTheme(name) || themes[0];
 
   const activeTheme = findThemeEntry(activeThemeHerdrName);
   const darkTheme = findThemeEntry(darkThemeName);
@@ -630,8 +691,8 @@ export async function readHerdrState(appHome, herdrBin, themes) {
     themeState: {
       appearance,
       effectiveMode,
-      activeThemeId: activeTheme?.id || "catppuccin-mocha",
-      darkThemeId: darkTheme?.id || "catppuccin-mocha",
+      activeThemeId: activeTheme?.id || "graphite",
+      darkThemeId: darkTheme?.id || "graphite",
       lightThemeId: lightTheme?.id || "paper",
       activeHerdrName: activeThemeHerdrName,
       darkHerdrName: darkThemeName,
@@ -664,24 +725,42 @@ export async function ensureHerdrThemeInstalled(appHome, themeEntry) {
   if (!themeEntry) throw new Error("Theme entry not found");
   const builtinIds = new Set(["graphite", "ink", "moss", "paper"]);
   if (builtinIds.has(themeEntry.id)) {
-    return { herdrName: themeEntry.id, path: null, builtin: true };
+    return { herdrName: themeEntry.id, path: null, builtin: true, freshlyCreated: false };
   }
   const slug = slugifyThemeName(themeEntry.herdrName || themeEntry.id);
   const themesDir = path.join(appHome, "themes");
   await mkdir(themesDir, { recursive: true });
   const targetPath = path.join(themesDir, `${slug}.json`);
+  const existedBefore = await fileExists(targetPath);
   const themeJson = toHerdrThemeJson(themeEntry);
   await writeFileAtomic(targetPath, themeJson);
   themeEntry.installedInHerdr = true;
   themeEntry.herdrName = slug;
-  return { herdrName: slug, path: targetPath, builtin: false, json: themeJson };
+  return {
+    herdrName: slug,
+    path: targetPath,
+    builtin: false,
+    freshlyCreated: !existedBefore,
+    json: themeJson,
+  };
 }
 
-export async function applyStudioChanges(appHome, herdrBin, themes, payload = {}) {
+export async function applyStudioChanges(appHome, herdrBin, themes, payload = {}, options = {}) {
   const settingsPath = path.join(appHome, "settings.json");
   const sharedPath = path.join(appHome, "shared.json");
-  const settingsJson = await readJsonSafe(settingsPath, {});
-  const sharedJson = await readJsonSafe(sharedPath, {});
+  const [settingsJson, sharedJson, statusRes, systemAppearance] = await Promise.all([
+    readJsonSafe(settingsPath, {}),
+    readJsonSafe(sharedPath, {}),
+    runCmd(herdrBin, ["status"], { env: { HERDR_APP_HOME: appHome } }),
+    detectSystemAppearance(options.systemAppearance),
+  ]);
+
+  let liveStatus = null;
+  if (statusRes.ok && statusRes.stdout) {
+    try {
+      liveStatus = JSON.parse(statusRes.stdout);
+    } catch {}
+  }
 
   const findTheme = (idOrName) => {
     if (!idOrName) return null;
@@ -693,6 +772,19 @@ export async function applyStudioChanges(appHome, herdrBin, themes, payload = {}
         t.name.toLowerCase() === String(idOrName).toLowerCase(),
     );
   };
+
+  let activeLayout = liveStatus?.layout || sharedJson?.layout || "mine";
+  const initialLayoutPath = path.join(appHome, "layouts", `${activeLayout}.json`);
+  const initialStatePath = path.join(appHome, "layouts", ".state", `${activeLayout}.json`);
+  const [initialLayoutTree, initialLayoutState] = await Promise.all([
+    readJsonSafe(initialLayoutPath, {}),
+    readJsonSafe(initialStatePath, {}),
+  ]);
+
+  const currentPair = resolveThemePair(initialLayoutState, initialLayoutTree, settingsJson, findTheme);
+  let nextDarkName = currentPair.darkHerdrName;
+  let nextLightName = currentPair.lightHerdrName;
+  const freshlyCreatedThemes = new Set();
 
   const themeAction = payload.themeAction;
   const commandsRun = [];
@@ -710,10 +802,8 @@ export async function applyStudioChanges(appHome, herdrBin, themes, payload = {}
       const lt = findTheme(themeAction.lightThemeId);
       if (lt) {
         const installed = await ensureHerdrThemeInstalled(appHome, lt);
-        await runCmd(herdrBin, ["do", "app.theme", "--name", installed.herdrName], {
-          env: { HERDR_APP_HOME: appHome },
-        });
-        commandsRun.push(`app.theme:${installed.herdrName}`);
+        nextLightName = installed.herdrName;
+        if (installed.freshlyCreated) freshlyCreatedThemes.add(installed.herdrName);
       }
     }
 
@@ -721,10 +811,8 @@ export async function applyStudioChanges(appHome, herdrBin, themes, payload = {}
       const dt = findTheme(themeAction.darkThemeId);
       if (dt) {
         const installed = await ensureHerdrThemeInstalled(appHome, dt);
-        await runCmd(herdrBin, ["do", "app.theme", "--name", installed.herdrName], {
-          env: { HERDR_APP_HOME: appHome },
-        });
-        commandsRun.push(`app.theme:${installed.herdrName}`);
+        nextDarkName = installed.herdrName;
+        if (installed.freshlyCreated) freshlyCreatedThemes.add(installed.herdrName);
       }
     }
 
@@ -732,13 +820,15 @@ export async function applyStudioChanges(appHome, herdrBin, themes, payload = {}
       const at = findTheme(themeAction.activeThemeId);
       if (at) {
         const installed = await ensureHerdrThemeInstalled(appHome, at);
+        if (installed.freshlyCreated) freshlyCreatedThemes.add(installed.herdrName);
+        if (at.mode === "light") {
+          nextLightName = installed.herdrName;
+        } else {
+          nextDarkName = installed.herdrName;
+        }
         if (themeAction.autoSwitchAppearance !== false) {
           settingsJson.appearance = at.mode === "light" ? "light" : "dark";
         }
-        await runCmd(herdrBin, ["do", "app.theme", "--name", installed.herdrName], {
-          env: { HERDR_APP_HOME: appHome },
-        });
-        commandsRun.push(`app.theme:${installed.herdrName}`);
       }
     }
   }
@@ -779,11 +869,21 @@ export async function applyStudioChanges(appHome, herdrBin, themes, payload = {}
     }
   }
 
+  const lp = payload.layoutPatch;
+  const hasLayoutPatch = Boolean(lp && typeof lp === "object" && Object.keys(lp).length > 0);
+
+  // Persist { light, dark } in settings.json so layout.set or missing .state never resets themes
+  if (themeAction || hasLayoutPatch || settingsJson.theme !== undefined) {
+    settingsJson.theme = {
+      light: nextLightName,
+      dark: nextDarkName,
+    };
+  }
+
   await writeFileAtomic(settingsPath, settingsJson);
 
-  const lp = payload.layoutPatch;
-  if (lp && typeof lp === "object" && Object.keys(lp).length > 0) {
-    let activeLayout = sharedJson.layout || "mine";
+  // Apply layoutPatch BEFORE app.theme because `layout.set` clears `layouts/.state/<name>.json`'s theme
+  if (hasLayoutPatch) {
     const shipped = new Set(["main", "terminals", "win98"]);
     if (shipped.has(activeLayout)) {
       const minePath = path.join(appHome, "layouts", "mine.json");
@@ -808,6 +908,7 @@ export async function applyStudioChanges(appHome, herdrBin, themes, payload = {}
     await runCmd(herdrBin, ["do", "layout.set", "--layout", JSON.stringify(nextTree)], {
       env: { HERDR_APP_HOME: appHome },
     });
+    commandsRun.push(`layout.set:${activeLayout}`);
 
     if (lp.sidebar_width !== undefined) {
       await runCmd(
@@ -815,6 +916,31 @@ export async function applyStudioChanges(appHome, herdrBin, themes, payload = {}
         ["do", "layout.resize", "--id", "sidebar", "--px", String(Math.round(Number(lp.sidebar_width)))],
         { env: { HERDR_APP_HOME: appHome } },
       );
+      commandsRun.push(`layout.resize:sidebar`);
+    }
+  }
+
+  // Apply (or re-apply after layout.set) both light and dark themes, ending with the effective active half
+  if (themeAction || hasLayoutPatch) {
+    const effectiveAppearance =
+      settingsJson.appearance === "light"
+        ? "light"
+        : settingsJson.appearance === "dark"
+          ? "dark"
+          : systemAppearance;
+    const orderedThemes =
+      effectiveAppearance === "light"
+        ? [nextDarkName, nextLightName]
+        : [nextLightName, nextDarkName];
+
+    for (const herdrName of [...new Set(orderedThemes.filter(Boolean))]) {
+      await applyHerdrThemeCommand(
+        herdrBin,
+        appHome,
+        herdrName,
+        freshlyCreatedThemes.has(herdrName),
+      );
+      commandsRun.push(`app.theme:${herdrName}`);
     }
   }
 

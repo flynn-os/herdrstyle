@@ -612,6 +612,7 @@ function scheduleLiveApply(payload, immediate = false) {
         ingestServerState(res);
         renderStatusStrip();
         renderThemeSelectors();
+        renderThemeGallery();
         renderLiveStage();
         if (state.stageView === "shot") {
           setTimeout(refreshLiveShot, 120);
@@ -631,10 +632,16 @@ function selectTheme(themeId) {
   state.themeState.activeThemeId = themeObj.id;
   if (themeObj.mode === "light") {
     state.themeState.lightThemeId = themeObj.id;
-    if (state.themeState.appearance !== "system") state.themeState.appearance = "light";
+    if (state.themeState.appearance !== "system" || state.themeState.effectiveMode !== "light") {
+      state.themeState.appearance = "light";
+    }
+    state.themeState.effectiveMode = "light";
   } else {
     state.themeState.darkThemeId = themeObj.id;
-    if (state.themeState.appearance !== "system") state.themeState.appearance = "dark";
+    if (state.themeState.appearance !== "system" || state.themeState.effectiveMode !== "dark") {
+      state.themeState.appearance = "dark";
+    }
+    state.themeState.effectiveMode = "dark";
   }
   state.effectiveSemantic = themeObj.semantic || {};
 
@@ -642,8 +649,11 @@ function selectTheme(themeId) {
   scheduleLiveApply(
     {
       themeAction: {
+        appearance: state.themeState.appearance,
+        darkThemeId: state.themeState.darkThemeId,
+        lightThemeId: state.themeState.lightThemeId,
         activeThemeId: themeObj.id,
-        autoSwitchAppearance: state.themeState.appearance !== "system",
+        autoSwitchAppearance: false,
       },
     },
     true,
@@ -783,25 +793,43 @@ function bindEvents() {
     btn.addEventListener("click", () => {
       const ap = btn.dataset.appearance;
       state.themeState.appearance = ap;
-      if (ap === "light") state.themeState.activeThemeId = state.themeState.lightThemeId;
-      else if (ap === "dark") state.themeState.activeThemeId = state.themeState.darkThemeId;
+      if (ap === "light") {
+        state.themeState.effectiveMode = "light";
+        state.themeState.activeThemeId = state.themeState.lightThemeId;
+      } else if (ap === "dark") {
+        state.themeState.effectiveMode = "dark";
+        state.themeState.activeThemeId = state.themeState.darkThemeId;
+      }
       renderAll();
-      scheduleLiveApply({ themeAction: { appearance: ap } }, true);
+      scheduleLiveApply(
+        {
+          themeAction: {
+            appearance: ap,
+            darkThemeId: state.themeState.darkThemeId,
+            lightThemeId: state.themeState.lightThemeId,
+          },
+        },
+        true,
+      );
     });
   });
 
   $("#dark-theme-select").addEventListener("change", (e) => {
     const id = e.target.value;
     state.themeState.darkThemeId = id;
-    if (state.themeState.appearance !== "light") {
+    const isDarkActive = state.themeState.effectiveMode !== "light";
+    if (isDarkActive) {
       state.themeState.activeThemeId = id;
+      const dt = state.themes.find((t) => t.id === id);
+      if (dt?.semantic) state.effectiveSemantic = dt.semantic;
     }
     renderAll();
     scheduleLiveApply(
       {
         themeAction: {
           darkThemeId: id,
-          activeThemeId: state.themeState.appearance !== "light" ? id : undefined,
+          activeThemeId: isDarkActive ? id : undefined,
+          autoSwitchAppearance: false,
         },
       },
       true,
@@ -811,15 +839,19 @@ function bindEvents() {
   $("#light-theme-select").addEventListener("change", (e) => {
     const id = e.target.value;
     state.themeState.lightThemeId = id;
-    if (state.themeState.appearance === "light") {
+    const isLightActive = state.themeState.effectiveMode === "light";
+    if (isLightActive) {
       state.themeState.activeThemeId = id;
+      const lt = state.themes.find((t) => t.id === id);
+      if (lt?.semantic) state.effectiveSemantic = lt.semantic;
     }
     renderAll();
     scheduleLiveApply(
       {
         themeAction: {
           lightThemeId: id,
-          activeThemeId: state.themeState.appearance === "light" ? id : undefined,
+          activeThemeId: isLightActive ? id : undefined,
+          autoSwitchAppearance: false,
         },
       },
       true,

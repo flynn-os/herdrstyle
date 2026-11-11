@@ -5,7 +5,14 @@
 import { mkdir, readdir, rm } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
-import { fileExists, readHerdrState, readJsonSafe, runCmd, writeFileAtomic } from "./herdr-bridge.mjs";
+import {
+  applyHerdrThemeCommand,
+  fileExists,
+  readHerdrState,
+  readJsonSafe,
+  runCmd,
+  writeFileAtomic,
+} from "./herdr-bridge.mjs";
 import { slugifyThemeName } from "./themes-catalog.mjs";
 
 export function getHistoryDir(appHome) {
@@ -92,12 +99,26 @@ export async function restoreSnapshotById(appHome, herdrBin, snapshotId) {
   const snap = await readJsonSafe(filePath, null);
   if (!snap || !snap.files) throw new Error("Snapshot data is corrupted.");
 
+  let freshlyWrittenThemeName = null;
   if (snap.files.theme && snap.files.activeThemeHerdrName) {
-    const themePath = path.join(appHome, "themes", `${slugifyThemeName(snap.files.activeThemeHerdrName)}.json`);
+    const slug = slugifyThemeName(snap.files.activeThemeHerdrName);
+    const themePath = path.join(appHome, "themes", `${slug}.json`);
+    const existed = await fileExists(themePath);
     await writeFileAtomic(themePath, snap.files.theme);
+    if (!existed) freshlyWrittenThemeName = slug;
   }
   if (snap.files.settings) {
-    await writeFileAtomic(path.join(appHome, "settings.json"), snap.files.settings);
+    const restoredSettings = { ...snap.files.settings };
+    if (
+      !restoredSettings.theme &&
+      (snap.files.lightHerdrName || snap.files.darkHerdrName)
+    ) {
+      restoredSettings.theme = {
+        light: snap.files.lightHerdrName || "paper",
+        dark: snap.files.darkHerdrName || "graphite",
+      };
+    }
+    await writeFileAtomic(path.join(appHome, "settings.json"), restoredSettings);
   }
   if (snap.files.layout && snap.files.activeLayout) {
     const layoutPath = path.join(appHome, "layouts", `${snap.files.activeLayout}.json`);
@@ -107,19 +128,28 @@ export async function restoreSnapshotById(appHome, herdrBin, snapshotId) {
     });
   }
   if (snap.files.lightHerdrName) {
-    await runCmd(herdrBin, ["do", "app.theme", "--name", snap.files.lightHerdrName], {
-      env: { HERDR_APP_HOME: appHome },
-    });
+    await applyHerdrThemeCommand(
+      herdrBin,
+      appHome,
+      snap.files.lightHerdrName,
+      freshlyWrittenThemeName === slugifyThemeName(snap.files.lightHerdrName),
+    );
   }
   if (snap.files.darkHerdrName) {
-    await runCmd(herdrBin, ["do", "app.theme", "--name", snap.files.darkHerdrName], {
-      env: { HERDR_APP_HOME: appHome },
-    });
+    await applyHerdrThemeCommand(
+      herdrBin,
+      appHome,
+      snap.files.darkHerdrName,
+      freshlyWrittenThemeName === slugifyThemeName(snap.files.darkHerdrName),
+    );
   }
   if (snap.files.activeThemeHerdrName) {
-    await runCmd(herdrBin, ["do", "app.theme", "--name", snap.files.activeThemeHerdrName], {
-      env: { HERDR_APP_HOME: appHome },
-    });
+    await applyHerdrThemeCommand(
+      herdrBin,
+      appHome,
+      snap.files.activeThemeHerdrName,
+      freshlyWrittenThemeName === slugifyThemeName(snap.files.activeThemeHerdrName),
+    );
   }
   return snap;
 }

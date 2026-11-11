@@ -11,6 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import {
+  applyHerdrThemeCommand,
   applyStudioChanges,
   fileExists,
   findGhosttyBinary,
@@ -249,14 +250,26 @@ export async function createHerdrStyleServer(options = {}) {
         if (!requireToken()) return;
         const base = await ensureBaseline();
         if (base?.files) {
+          let freshlyWrittenThemeName = null;
           if (base.files.theme && base.files.activeThemeHerdrName) {
-            await writeFileAtomic(
-              path.join(appHome, "themes", `${slugifyThemeName(base.files.activeThemeHerdrName)}.json`),
-              base.files.theme,
-            );
+            const slug = slugifyThemeName(base.files.activeThemeHerdrName);
+            const themePath = path.join(appHome, "themes", `${slug}.json`);
+            const existed = await fileExists(themePath);
+            await writeFileAtomic(themePath, base.files.theme);
+            if (!existed) freshlyWrittenThemeName = slug;
           }
           if (base.files.settings) {
-            await writeFileAtomic(path.join(appHome, "settings.json"), base.files.settings);
+            const restoredSettings = { ...base.files.settings };
+            if (
+              !restoredSettings.theme &&
+              (base.files.lightHerdrName || base.files.darkHerdrName)
+            ) {
+              restoredSettings.theme = {
+                light: base.files.lightHerdrName || "paper",
+                dark: base.files.darkHerdrName || "graphite",
+              };
+            }
+            await writeFileAtomic(path.join(appHome, "settings.json"), restoredSettings);
           }
           if (base.files.layout && base.files.activeLayout) {
             await writeFileAtomic(
@@ -268,14 +281,28 @@ export async function createHerdrStyleServer(options = {}) {
             });
           }
           if (base.files.lightHerdrName) {
-            await runCmd(herdrBin, ["do", "app.theme", "--name", base.files.lightHerdrName], {
-              env: { HERDR_APP_HOME: appHome },
-            });
+            await applyHerdrThemeCommand(
+              herdrBin,
+              appHome,
+              base.files.lightHerdrName,
+              freshlyWrittenThemeName === slugifyThemeName(base.files.lightHerdrName),
+            );
           }
           if (base.files.darkHerdrName) {
-            await runCmd(herdrBin, ["do", "app.theme", "--name", base.files.darkHerdrName], {
-              env: { HERDR_APP_HOME: appHome },
-            });
+            await applyHerdrThemeCommand(
+              herdrBin,
+              appHome,
+              base.files.darkHerdrName,
+              freshlyWrittenThemeName === slugifyThemeName(base.files.darkHerdrName),
+            );
+          }
+          if (base.files.activeThemeHerdrName) {
+            await applyHerdrThemeCommand(
+              herdrBin,
+              appHome,
+              base.files.activeThemeHerdrName,
+              freshlyWrittenThemeName === slugifyThemeName(base.files.activeThemeHerdrName),
+            );
           }
         }
         const [themes, fonts] = await Promise.all([getThemes(true), getFonts()]);
@@ -392,10 +419,15 @@ export async function createHerdrStyleServer(options = {}) {
           await runCmd(herdrBin, ["do", "layout.set", "--layout", JSON.stringify(parsed)], {
             env: { HERDR_APP_HOME: appHome },
           });
+          const orderedThemes =
+            state.themeState.effectiveMode === "light"
+              ? [state.themeState.darkHerdrName, state.themeState.lightHerdrName]
+              : [state.themeState.lightHerdrName, state.themeState.darkHerdrName];
+          for (const herdrName of [...new Set(orderedThemes.filter(Boolean))]) {
+            await applyHerdrThemeCommand(herdrBin, appHome, herdrName, false);
+          }
         } else if (target === "theme") {
-          await runCmd(herdrBin, ["do", "app.theme", "--name", state.themeState.activeHerdrName], {
-            env: { HERDR_APP_HOME: appHome },
-          });
+          await applyHerdrThemeCommand(herdrBin, appHome, state.themeState.activeHerdrName, true);
         }
 
         const updatedThemes = await getThemes(true);
